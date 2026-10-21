@@ -24,7 +24,7 @@ The app follows the Windows default playback device. If APO is not installed on 
 
 Requires **Windows 11 x64**, an installed and configured **Equalizer APO**, and the **.NET 10 Windows Desktop Runtime x64**.
 
-1. Open the [latest release](https://github.com/hakanasora/ApoSwitch/releases/latest) and download the main EXE. You do not need `device-debug-tools.zip` or the source archives for everyday use.
+1. Open the [latest release](https://github.com/hakanasora/ApoSwitch/releases/latest) and download the main EXE. 
 2. Put the EXE in a permanent location, save it as `ApoSwitch.exe`, and run it. Startup at sign-in also expects this filename.
 3. If prompted about a missing runtime, install the separately provided `windowsdesktop-runtime-…-win-x64.exe`, then run the app again. Alternatively, select **.NET Desktop Runtime → Windows → x64** on [Microsoft's download page](https://dotnet.microsoft.com/en-us/download/dotnet/10.0). The plain .NET Runtime does not include desktop UI support; you do not need the SDK.
 4. Find the tray icon, click it to open the menu, and choose a preset. The icon may be in the tray's hidden-icons area.
