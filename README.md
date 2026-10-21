@@ -1,75 +1,84 @@
-<p align="center"><img src="assets/ApoSwitch-512.png" width="160" alt="APO Switch icon"></p>
+<p align="center"><img src="assets/ApoSwitch-512.png" width="128" alt="ApoSwitch 应用图标"></p>
 
-# APO 切换器 · ApoSwitch 1.0.12
+# ApoSwitch · APO 切换器
 
-一个轻量的 Windows 托盘工具，用单击菜单或双击循环切换 Equalizer APO 的一级校准配置。
+通过 Windows 托盘快速切换 Equalizer APO 校准配置：单击选择，双击轮换。
 
-[English](README.en.md) · [MIT License](LICENSE) · [GitHub](https://github.com/hakanasora/ApoSwitch)
+**[下载最新版](https://github.com/hakanasora/ApoSwitch/releases/latest)** · [English](README.en.md)
 
-## 下载与运行
+## 为什么开发
 
-适用于 Windows 11 x64 和 Equalizer APO。正式 `app` 目录只有一个 `ApoSwitch.exe`，项目代码、核心库和应用图标均已集成；旁边不需要 DLL、语言文件夹、JSON 清单或展示图片。
+不同的使用场景，可能需要不同的声音校准。如果已经准备了几套 Equalizer APO 配置，每次切换都打开编辑器、逐一启用和禁用配置，会打断正在做的事。
 
-需要 **.NET 10 Windows Desktop Runtime x64**。已有兼容桌面运行时的用户直接运行。缺少环境时，双击可选 `runtime` 目录中的微软官方 `windowsdesktop-runtime-10.0.12-win-x64.exe`，按安装程序提示完成后，再运行 ApoSwitch。只装普通 .NET Runtime 不包含桌面界面支持。无需安装 SDK 或开发工具；系统级安装可能需要管理员授权。
+ApoSwitch 把这些操作放到托盘中：直接选择一套配置，或把常用的几套加入循环，双击图标即可切换。托盘上的 `EQ1`、`EQ2` 等编号，让当前使用的配置一眼可见。
 
-补充包单独提供，不重复装进主 EXE，也不会由 ApoSwitch 自动下载安装。可从[微软官方下载页](https://dotnet.microsoft.com/en-us/download/dotnet/10.0)获取兼容的 x64 桌面运行时；随包安装器已按官方 SHA512 和微软数字签名核验，核验信息见 `runtime/verification.json`。
+## 如何工作
 
-交付目录：`app` 为正式单 EXE，`runtime` 为可选环境补充包，`docs` 为说明、许可证和展示素材，`device-debug` 为独立调试工具，`source` 为源码。运行时补充包仍有自身的体积；下载主程序的用户不必重复下载它。
+ApoSwitch 在后台驻留，自动查找并读取 Equalizer APO 的主 `config.txt`，把它**直接引用的一级配置文件**列在菜单中，包括已注释禁用的 Include。
 
-## 日常使用
+选择配置时，只启用所选的一级 Include，并禁用其他一级候选；内部嵌套的配置保持原样。声音处理仍由 Equalizer APO 完成，ApoSwitch 使用你已有的配置，不生成校准或滤波器。
 
-1. 左键单击或右键单击托盘图标打开菜单；双击在“循环以下配置”中勾选的校准间轮换。单击会等待系统双击间隔后展开菜单。
-2. 一级配置菜单直接应用一套配置，启用所选 Include，禁用其他一级候选；再次选择当前项不会将它关闭。
-3. **循环以下配置** 独立决定循环成员，每次勾选立即保存，菜单保持展开，便于连续选择。循环成员不会同时被启用。
-4. **配置文件位置 → 选择 config.txt…** 可以手动指定 Equalizer APO 真正使用的主配置文件；**恢复自动定位** 取消手选位置。
-5. **开机自启动** 使用当前用户登录启动项，默认关闭；**退出** 保留当前已应用的校准。正式版与调试托盘共用单实例锁。
+程序跟随 Windows 默认播放设备。当该设备未安装 APO 时，会显示不适用状态并暂停配置切换。启动程序只读取现状，不主动切换配置。
 
-图标显示 `EQ1`、`EQ2` 等编号，按主文件中全部一级配置的顺序确定，包含禁用项，与循环勾选无关。全部未启用时显示 `EQ?`，外部编辑同时启用多套时显示 `EQ+`；应用任意配置后仍只启用所选的一套。未安装 APO 的设备显示大号单色 Blocked 符号与左下角 EQ 角标；没有设备、检测失败或配置读取失败时显示黄色警告。菜单和托盘图标跟随系统主题及缩放比例变化。
+## 下载与开始使用
 
-启动只读取现状，不自动套用上次配置。初次循环优先识别 `New Door Open` 与 `GSR_BK_filters`；无匹配时以当前启用项初始化。后续新增配置不自动参加循环。空循环不操作，单成员已启用时不重复写入。
+需要 **Windows 11 x64**、已安装并配置好的 **Equalizer APO**，以及 **.NET 10 Windows Desktop Runtime x64**。
 
-## 配置位置与文件保护
+1. 打开[最新版下载页面](https://github.com/hakanasora/ApoSwitch/releases/latest)，下载主程序 EXE。普通使用无需下载 `device-debug-tools.zip` 或源码包。
+2. 将 EXE 放到固定位置，保存为 `ApoSwitch.exe` 后运行。这个文件名也是“开机自启动”使用的名称。
+3. 如果提示缺少运行环境，安装发行版中单独提供的 `windowsdesktop-runtime-…-win-x64.exe`，再运行主程序。也可以从[微软官方下载页](https://dotnet.microsoft.com/en-us/download/dotnet/10.0)选择 **.NET Desktop Runtime → Windows → x64**；普通 .NET Runtime 不包含桌面界面支持，无需安装 SDK。
+4. 在任务栏托盘中找到图标，单击打开菜单，选择配置即可。图标也可能位于托盘的折叠菜单中。
 
-自动定位读取 `HKLM\SOFTWARE\EqualizerAPO`，依次考虑 64 位和 32 位视图中的 `ConfigPath`。两处均未提供时尝试 `InstallPath\config`，最后尝试系统 Program Files 下的默认 Equalizer APO 配置目录；并未写死开发者电脑的盘符或安装位置。
+如果没有找到配置，使用 **配置文件位置 → 选择 config.txt…**，选中 Equalizer APO 实际加载的主配置文件。
 
-已经得到明确的 ConfigPath，却找不到或无法读取主文件时会报错，不悄悄使用另一份旧默认配置。手选位置优先并会记住；该位置失效后保持报错，不自行换回自动路径。选择取消、文件不可读或设置保存失败时保留之前的选择。
+## 日常操作
 
-选择位置只改变切换器读取和操作的主文件，不修改 APO 注册表、不创建配置、不自动启用任何 Include。请选 APO 实际加载的 `config.txt`。自动模式会在打开菜单和应用前重新定位，外部保存由文件监听和定时刷新跟进；切换位置时监听也随之更换。
+| 想做什么 | 如何操作 |
+| --- | --- |
+| 打开菜单 | 左键单击或右键单击托盘图标 |
+| 立即使用一套配置 | 点击菜单上方对应的配置名称 |
+| 设置双击循环成员 | 在 **循环以下配置** 中勾选常用配置，可连续勾选，菜单保持展开 |
+| 切换到下一套 | 双击托盘图标，按主配置中的排列顺序轮换 |
+| 更换主配置位置 | **配置文件位置 → 选择 config.txt…**；也可 **恢复自动定位** |
+| 登录 Windows 时启动 | 勾选 **开机自启动**，默认关闭 |
+| 退出 | 点击 **退出**，当前 APO 配置保持不变 |
 
-**只识别主文件直接列出的 `Include:` 与 `# Include:`，不扫描目录、不递归读取嵌套文件。** 切换只调整主文件中候选 Include 的启用状态，保留其他指令、文字、编码和换行。上一版备份为同目录的 `config.txt.aposwitch.bak`。配置目录需要写权限；失败会明确提示，不显示为成功。滤波器资源和实际声音效果请用 Equalizer APO 和试听确认。
+**循环列表可以勾选多项，但每次应用只启用一套配置。** 勾选循环成员只决定双击时切换哪些配置，不会同时启用它们。循环选择会保存，新增配置不会自动加入循环；未勾选任何成员时，双击不操作。
 
-设置仍位于 `%LOCALAPPDATA%\ApoSwitch\settings.json`，其中 `ConfigFilePath` 为空表示自动定位。旧版本设置继续兼容，循环成员与手选路径一起保存。它们不会随 EXE 移动。自启动位于当前用户 `HKCU\Software\Microsoft\Windows\CurrentVersion\Run\ApoSwitch`；更换程序存放目录后应重新开关一次自启动。
+左键单击会等待系统双击间隔后展开菜单，以便识别双击动作。
 
-## 设备状态
+## 图标与设备状态
 
-跟随 Windows 默认多媒体播放设备。设备通知、每 5 秒轮询、打开菜单和应用前都会刷新。检测的是 Equalizer APO 的设备效果注册状态，覆盖 LFX/GFX、SFX/MFX、SFX/EFX。独占播放或系统关闭音效不等同于“未安装 APO”。
+| 图标或状态 | 含义 |
+| --- | --- |
+| `EQ1`、`EQ2`… | 当前启用配置在主文件中的顺序编号，包含禁用项，与循环勾选无关 |
+| `EQ+` | 在 APO 编辑器或其他外部编辑中同时启用了多套配置；通过托盘重新选择后只保留所选的一套 |
+| `EQ?` | 当前没有启用任何一级配置 |
+| 禁止符号与 EQ 角标 | 默认播放设备未安装 APO，鼠标悬停显示“当前设备不适用” |
+| 黄色警告 | 没有播放设备、设备检测失败或配置读取失败，可打开菜单查看详情 |
 
-未安装 APO、没有设备或检测失败时，一级配置应用及双击切换不可用；循环设置、配置位置、自启动和退出仍可操作。错误区域独立分组并显示设备名称；配置读取失败时同时给出具体文件错误。
+设备不适用时，直接应用和双击切换不可用；循环设置、配置位置、自启动和退出仍可操作。鼠标悬停可以查看当前配置或设备状态，菜单中的错误分组也会显示设备名称。菜单和图标跟随系统深浅色主题及缩放比例。
 
-## 独立设备调试工具
+## 常见问题
 
-正式 `ApoSwitch.exe` 只引用核心库，没有模拟模块依赖、模拟启动参数或命名管道服务端入口。
+### 为什么找不到配置，或新增的文件没有出现在菜单里？
 
-`device-debug` 中包括正式 `ApoSwitch.exe`、独立 `ApoSwitch.Debug.exe` 和 `ApoSwitch.DeviceSimulator.exe` 三个单文件程序，均使用共享的桌面运行时。先退出正式托盘，再打开模拟器，点击 **启动调试托盘 → 连接**，选择四种设备状态或恢复真实检测。关闭或断开模拟器会清除模拟状态；两种托盘的自启动始终指向正式 EXE。
+候选仅来自主 `config.txt` 直接写出的 `Include:` 和已注释的 `# Include:`。仅把文件放进配置目录不会加入菜单；把文件作为一级 Include 引用并保存后，列表会自动更新。
 
-**只模拟设备状态；在调试托盘选择校准仍会真实修改当前主配置。** 模拟状态仅存内存，重启不会保留。调试托盘链接共用的 UI 源码并注入调试设备源，配置逻辑始终共用，无需发布前手工删除模拟代码。
+若主文件本身无法读取，请在 **配置文件位置** 中选中正确文件。手选位置会被记住；要重新使用自动查找，选择 **恢复自动定位**。手选位置只影响切换器，不会改变 Equalizer APO 实际加载哪个主文件。
 
-## 源码与构建
+### 配置内部还有嵌套 Include，会不会被改动？
 
-需要 .NET 10 SDK，无第三方 NuGet 依赖。正常构建直接使用随源码提供的 ICO，不需要图形工具。
+不会。ApoSwitch 不展开嵌套文件，只调整主文件中一级候选的启用状态。其他指令、注释、编码和换行会保留，上一版主文件备份到同目录的 `config.txt.aposwitch.bak`。
 
-```powershell
-.\build.ps1 -RunChecks
-# 同时构建独立调试工具，使用新的空输出目录：
-.\build.ps1 -IncludeDeviceDebug -OutputDirectory .\artifacts-debug -RunChecks
-# 显式下载、校验可选官方运行时安装器，但不安装：
-.\build.ps1 -IncludeRuntime -OutputDirectory .\artifacts-with-runtime
-```
+### 为什么切换失败，或切换后听起来没有变化？
 
-默认输出 `artifacts`，下设 `app`、`docs` 等目录。要求输出目录为空，防止旧运行库混入。单文件采用框架依赖模式，关闭 ReadyToRun 与强制裁剪。SDK 可能需要还原微软的构建包。
+切换需要目标配置文件存在，并有主配置目录的写入权限。失败时会提示具体错误，请按提示检查文件和权限。设备状态检测依据 APO 的安装注册信息；实际音效还需确认 Equalizer APO 已在对应设备上正常工作，并检查配置中的资源。
 
-普通检查只在临时目录写入配置，真实设备查询只读。`-LiveConfigChecks` 才会短暂切换真实 APO 配置并恢复原始字节，不应在日常验收中误用。发布隔离检查命令为 `ApoSwitch.Checks --verify-release <app目录> <打包前程序集目录>`。
+### 移动 EXE 后，自启动为什么不正常？
 
-图标母版 `assets/ApoSwitch.svg` 保留原始矢量路径、平滑渐变和阴影，无噪声、嵌入位图或字体依赖；多尺寸 ICO 无损封装并嵌入 EXE。动态托盘使用系统 Segoe UI / Segoe Fluent Icons，不分发字体。需要重新生成图标时安装 Node.js 和 sharp，运行 `node tools/render-icon.cjs`。
+请保持文件名为 `ApoSwitch.exe`，放好后重新关闭、开启一次 **开机自启动**，以更新启动位置。循环成员等个人设置保存在当前 Windows 用户下，不随 EXE 移动。
 
-设备安装判断参考 [Equalizer APO 源码](https://github.com/mirror/equalizerapo/blob/master/DeviceAPOInfo.cpp)，路径读取依据 [APO 配置文档](https://sourceforge.net/p/equalizerapo/wiki/Configuration%20reference/)。
+## 开发与许可证
+
+[开发说明](DEVELOPMENT.md) · [MIT 许可证](LICENSE)

@@ -1,64 +1,84 @@
-<p align="center"><img src="assets/ApoSwitch-512.png" width="160" alt="APO Switch icon"></p>
+<p align="center"><img src="assets/ApoSwitch-512.png" width="128" alt="ApoSwitch application icon"></p>
 
-# ApoSwitch 1.0.12
+# ApoSwitch
 
-A small Windows tray app for switching Equalizer APO calibration presets.
+Switch Equalizer APO calibration presets from the Windows tray: click to choose, double-click to cycle.
 
-[中文说明](README.md) · [MIT License](LICENSE) · [GitHub](https://github.com/hakanasora/ApoSwitch)
+**[Download the latest release](https://github.com/hakanasora/ApoSwitch/releases/latest)** · [中文](README.md)
 
-## Run
+## Why ApoSwitch?
 
-Requires Windows 11 x64, Equalizer APO, and a compatible **.NET 10 Windows Desktop Runtime x64**. The production `app` directory contains only `ApoSwitch.exe`; application code, the core library and icon are bundled. No adjacent DLLs, runtime JSON, language folders or display images are needed.
+Different listening situations may call for different calibrations. Once you have several Equalizer APO configurations, opening the editor and enabling or disabling them each time interrupts what you are doing.
 
-If the desktop runtime is missing, run the optional official `runtime/windowsdesktop-runtime-10.0.12-win-x64.exe`, follow the installer, then run ApoSwitch again. The plain .NET Runtime does not include Windows Forms support. No SDK, commands or manual DLL copying are required. System-wide runtime installation requires administrator permission. The application never downloads or installs it automatically.
+ApoSwitch puts those actions in the tray. Choose a preset directly, or add your favorites to a cycle and double-click the icon to switch. Indicators such as `EQ1` and `EQ2` show which preset is active at a glance.
 
-The original installer is verified against Microsoft's SHA512 and digital signature. Its verification record is in `runtime/verification.json`. You may also use a compatible desktop runtime from [Microsoft](https://dotnet.microsoft.com/en-us/download/dotnet/10.0).
+## How it works
 
-Distribution layout: `app` for the production EXE, `runtime` for the optional installer, `docs` for documentation/license/artwork, `device-debug` for separate debug tools, and `source` for source code. Existing runtime installations are reused; the framework is not repeatedly bundled in the main download.
+ApoSwitch runs in the background, automatically locates Equalizer APO's main `config.txt`, and lists the **configuration files directly included by that file**, including commented-out Includes.
 
-## Use
+Selecting a preset enables its root-level Include and disables the other candidates. Nested configuration files stay untouched. Equalizer APO handles the audio processing; ApoSwitch uses your existing presets and does not create calibrations or filters.
 
-- Left-click or right-click the tray icon to open the menu. Double-click cycles through checked members. Single-click waits for the system double-click interval.
-- The main preset list enables exactly one preset and disables other root-level preset Includes.
-- **循环以下配置** independently selects cycle members and stays open for consecutive selections.
-- **配置文件位置 → 选择 config.txt…** selects the root file actually used by APO. **恢复自动定位** returns to registry-based discovery.
-- **开机自启动** enables startup for the current user; **退出** exits without reverting the active APO configuration.
+The app follows the Windows default playback device. If APO is not installed on that device, it shows an unavailable state and pauses preset switching. Starting the app reads the current configuration without changing it.
 
-`EQ1`, `EQ2`, etc. follow the order in the root file, including disabled candidates. External edits enabling multiple presets show `EQ+`; none enabled shows `EQ?`. Selecting a preset through the app still enables only that preset. Startup never applies a preset automatically. The initial cycle recognizes `New Door Open` and `GSR_BK_filters`, falling back to currently enabled items when no names match. New candidates do not automatically join the cycle.
+## Download and get started
 
-Only direct `Include:` and commented `# Include:` lines in the root file become candidates. Nested files are never enumerated or modified. Switching preserves other directives, encoding, comments and line endings, and saves the previous root as `config.txt.aposwitch.bak`. Write permission is required; failures are reported. Check resource paths and audible results using Equalizer APO and listening.
+Requires **Windows 11 x64**, an installed and configured **Equalizer APO**, and the **.NET 10 Windows Desktop Runtime x64**.
 
-## Configuration discovery
+1. Open the [latest release](https://github.com/hakanasora/ApoSwitch/releases/latest) and download the main EXE. You do not need `device-debug-tools.zip` or the source archives for everyday use.
+2. Put the EXE in a permanent location, save it as `ApoSwitch.exe`, and run it. Startup at sign-in also expects this filename.
+3. If prompted about a missing runtime, install the separately provided `windowsdesktop-runtime-…-win-x64.exe`, then run the app again. Alternatively, select **.NET Desktop Runtime → Windows → x64** on [Microsoft's download page](https://dotnet.microsoft.com/en-us/download/dotnet/10.0). The plain .NET Runtime does not include desktop UI support; you do not need the SDK.
+4. Find the tray icon, click it to open the menu, and choose a preset. The icon may be in the tray's hidden-icons area.
 
-Automatic discovery reads `HKLM\SOFTWARE\EqualizerAPO`: 64-bit then 32-bit `ConfigPath`, followed by `InstallPath/config` only when no explicit ConfigPath exists, then the default Program Files location. It does not hard-code the developer's machine path.
+If no configurations are found, use **配置文件位置 → 选择 config.txt…** to select the main file actually loaded by Equalizer APO. The current app menus are in Chinese; the labels below match the interface.
 
-An explicit but missing/unreadable ConfigPath is reported rather than replaced by an unrelated default file. A manually selected root overrides automatic discovery and is remembered. If it disappears, the app continues reporting the missing location until the user selects another or restores automatic mode. Invalid selections and preference-save failures leave the previous selection intact; cancelling the picker changes nothing.
+## Everyday controls
 
-Selecting a file only changes the app's target. It does not update APO's registry, create files or activate presets. Select the real root `config.txt` loaded by APO. Automatic discovery refreshes before opening the menu or applying a preset. File monitoring follows location changes, with periodic polling as fallback.
+| Action | Control |
+| --- | --- |
+| Open the menu | Left-click or right-click the tray icon |
+| Apply a preset immediately | Click its name at the top of the menu |
+| Choose cycle members | Check presets in **循环以下配置**; the menu stays open for consecutive selections |
+| Switch to the next member | Double-click the tray icon; cycling follows their order in the main configuration |
+| Change the main file | **配置文件位置 → 选择 config.txt…**; **恢复自动定位** restores automatic discovery |
+| Start at Windows sign-in | Check **开机自启动**; off by default |
+| Exit | Choose **退出**; the current APO configuration stays active |
 
-Preferences remain in `%LOCALAPPDATA%\ApoSwitch\settings.json`; nullable `ConfigFilePath` selects automatic mode when absent/null. Older settings remain compatible. Cycle edits preserve the location, and preferences do not travel with the EXE. Startup uses the current-user Run registry entry; re-toggle it after moving the executable.
+**You can check several cycle members, but applying a preset enables only that one.** Cycle membership only controls which presets double-clicking visits; checking a member does not activate it. Your selection is saved, and new presets do not automatically join the cycle. With no members checked, double-clicking does nothing.
 
-## Device state and debug tools
+A left-click waits for the system double-click interval before opening the menu so the app can distinguish the two gestures.
 
-The default multimedia playback device is monitored through Core Audio and a five-second poll. APO registration determines whether preset application is enabled. Missing APO uses a monochrome Blocked symbol with an EQ badge; no device, detection failures and config errors use a yellow warning. Device errors include the device name. Cycle/location/startup settings remain available when application is disabled.
+## Icons and device state
 
-Production references only `ApoSwitch.Core`, with no simulation module dependency, debug argument or named-pipe server. The optional debug directory contains `ApoSwitch.exe`, `ApoSwitch.Debug.exe` and `ApoSwitch.DeviceSimulator.exe`, each bundled as a single EXE using the shared desktop runtime. The debug host shares UI/configuration source and injects a device-state source.
+| Icon or state | Meaning |
+| --- | --- |
+| `EQ1`, `EQ2`… | The active preset's position in the main file, counting disabled candidates too; independent of cycle membership |
+| `EQ+` | Multiple presets were enabled in the APO editor or another external edit; choosing one through the tray makes it the only active candidate |
+| `EQ?` | No root-level preset is enabled |
+| Blocked symbol with an EQ badge | APO is not installed on the default playback device; the tooltip reads “当前设备不适用” (current device is not applicable) |
+| Yellow warning | No playback device, a detection failure, or a configuration read error; open the menu for details |
 
-Exit the regular tray, run the simulator, launch the debug tray, connect, and select one of four device states. Disconnecting or restarting clears the override. Both hosts share one instance mutex and startup always targets the production executable. **Only device state is simulated: preset changes still modify the real selected APO root file.**
+When the device is unavailable, direct application and double-click switching are disabled. Cycle settings, configuration location, startup and exit remain accessible. Hover over the icon to see the current preset or device state; the menu's error group also identifies the device. The menu and icons follow the system light/dark theme and display scaling.
 
-## Build
+## Frequently asked questions
 
-Install the .NET 10 SDK. There are no third-party NuGet dependencies. Use an empty output directory:
+### Why are no presets found, or why is a new file missing from the menu?
 
-```powershell
-./build.ps1 -RunChecks
-./build.ps1 -IncludeDeviceDebug -OutputDirectory ./artifacts-debug -RunChecks
-# Explicitly download and verify the optional runtime installer, without installing:
-./build.ps1 -IncludeRuntime -OutputDirectory ./artifacts-with-runtime
-```
+Only direct `Include:` and commented `# Include:` lines in the main `config.txt` become candidates. Placing a file in the configuration folder is not enough. Add it as a root-level Include and save; the list updates automatically.
 
-Default output is `artifacts`, with `app` and `docs` subdirectories. Publishing is framework-dependent, single-file, with ReadyToRun and trimming disabled. The SDK may restore Microsoft build packages.
+If the main file cannot be read, select the correct file under **配置文件位置**. A manual location is remembered; choose **恢复自动定位** to return to automatic discovery. This choice changes the switcher's target, not which main file Equalizer APO loads.
 
-Normal checks modify only temporary configuration files and query the actual device read-only. `-LiveConfigChecks` explicitly enables tests that briefly switch and restore the real APO configuration. Production isolation checks use `--verify-release <app-directory> <pre-bundle-assembly-directory>` on the checks executable.
+### Will nested Includes be changed?
 
-`assets/ApoSwitch.svg` is the editable vector master. Lossless multi-size ICO artwork is embedded in the executable. Dynamic indicators use the system Segoe UI/Segoe Fluent Icons fonts, which are not redistributed. Ordinary builds need no image tools. To regenerate artwork: install Node.js and sharp, then run `node tools/render-icon.cjs`.
+No. ApoSwitch does not expand nested files and only changes the enabled state of root-level candidates. Other directives, comments, encoding and line endings are preserved. The previous main file is backed up as `config.txt.aposwitch.bak` in the same folder.
+
+### Why does switching fail, or why is there no audible change?
+
+The target preset must exist, and the main configuration folder must be writable. Failures report an error; check the indicated files and permissions. Device detection checks APO's installation registration. For audible results, also confirm Equalizer APO is working on that device and the configuration's resources are available.
+
+### Why does startup stop working after moving the EXE?
+
+Keep the filename `ApoSwitch.exe`, then turn **开机自启动** off and on again in the new location to update the startup entry. Cycle membership and other preferences belong to the current Windows user and do not move with the EXE.
+
+## Development and license
+
+[Development guide](DEVELOPMENT.en.md) · [MIT license](LICENSE)

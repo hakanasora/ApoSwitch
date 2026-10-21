@@ -40,7 +40,7 @@ if ($IncludeDeviceDebug) {
     if (@(Get-ChildItem -LiteralPath $debugOutput -Force).Count -ne 3) { throw 'Debug output must contain three standalone EXEs.' }
 }
 New-Item -ItemType Directory -Path (Join-Path $docsOutput 'assets') -Force | Out-Null
-foreach ($file in @('README.md','README.en.md','LICENSE')) {
+foreach ($file in @('README.md','README.en.md','DEVELOPMENT.md','DEVELOPMENT.en.md','LICENSE')) {
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot $file) -Destination $docsOutput
 }
 foreach ($file in @('ApoSwitch.svg','ApoSwitch-512.png','ApoSwitch-1024.png')) {
