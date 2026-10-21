@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ApplicationIcon>../../assets/ApoSwitch.ico</ApplicationIcon>
+  </PropertyGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="../../assets/ApoSwitch.ico" LogicalName="ApoSwitch.ApplicationIcon" />
+  </ItemGroup>
+  <ItemGroup><ProjectReference Include="../ApoSwitch.DeviceDebug/ApoSwitch.DeviceDebug.csproj" /></ItemGroup>
+</Project>

@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ApplicationManifest>../ApoSwitch/app.manifest</ApplicationManifest>
+    <ApplicationIcon>../../assets/ApoSwitch.ico</ApplicationIcon>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../ApoSwitch/*.cs" Exclude="../ApoSwitch/Program.cs" Link="Shared/%(Filename)%(Extension)" />
+    <ProjectReference Include="../ApoSwitch.Core/ApoSwitch.Core.csproj" />
+    <ProjectReference Include="../ApoSwitch.DeviceDebug/ApoSwitch.DeviceDebug.csproj" />
+  </ItemGroup>
+</Project>

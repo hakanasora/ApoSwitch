@@ -1,0 +1,38 @@
+using ApoSwitch.Core;
+
+namespace ApoSwitch;
+
+internal static class TrayMenuBuilder
+{
+    public static IReadOnlyList<MenuEntry> Build(DeviceState device, ConfigDocument? config, string? configError,
+        UserSettings? settings, bool debug, bool autoStart, Action<string> apply, Func<string, bool> toggleCycle,
+        Action toggleAutoStart, Action exit)
+    {
+        var entries = new List<MenuEntry> { new(debug ? "APO 切换器 · 调试模式" : "APO 切换器", false), MenuEntry.Separator };
+        if (!device.CanApply || configError is not null)
+        {
+            entries.Add(new(!device.CanApply ? device.StatusText : "无法读取 config.txt", false));
+            string name = !string.IsNullOrWhiteSpace(device.Name) ? device.Name
+                : device.Availability == DeviceAvailability.NoDevice ? "无播放设备" : "未知设备";
+            entries.Add(new("设备：" + name, false));
+            if (!device.CanApply && configError is not null) entries.Add(new("无法读取 config.txt", false));
+            entries.Add(MenuEntry.Separator);
+        }
+        var presets = config?.Presets ?? [];
+        foreach (var preset in presets)
+        {
+            string id = preset.Id;
+            entries.Add(new(preset.Name, device.CanApply && configError is null, preset.IsEnabled, () => apply(id)));
+        }
+        if (presets.Count == 0) entries.Add(new("未找到一级配置", false));
+        entries.Add(MenuEntry.Separator);
+        var cycleEntries = presets.Select(p => new MenuEntry(p.Name, Checked: settings?.Contains(p.Id) == true,
+            ToggleChecked: () => toggleCycle(p.Id))).ToList();
+        if (cycleEntries.Count == 0) cycleEntries.Add(new("未找到一级配置", false));
+        entries.Add(new("循环以下配置", Children: cycleEntries));
+        entries.Add(MenuEntry.Separator);
+        entries.Add(new("开机自启动", Checked: autoStart, Action: toggleAutoStart));
+        entries.Add(new("退出", Action: exit));
+        return entries;
+    }
+}
