@@ -280,8 +280,8 @@ internal static class Checks
             Assert(cycle.Children!.All(e => e.ToggleChecked is not null), "循环条目使用常驻勾选：" + state);
             Assert(cycle.Enabled && cycle.Children!.All(e => e.Enabled) && menu.Single(e => e.Text == "开机自启动").Enabled,
                 "循环与自启动始终可用：" + state);
-            var location = menu.Single(e => e.Text == "配置文件位置");
-            Assert(location.Enabled && location.Children!.Single(e => e.Text == "选择 config.txt…").Enabled,
+            var location = menu.Single(e => e.Text == "配置文件已自动识别");
+            Assert(location.Enabled && location.Children!.Single(e => e.Text == "手动配置 config.txt…").Enabled,
                 "所有设备状态均可手选配置位置：" + state);
             settings.ConfigFilePath = "C:\\selected\\config.txt";
             var manual = TrayMenuBuilder.Build(new(state), null, "文件缺失", settings, false, false,

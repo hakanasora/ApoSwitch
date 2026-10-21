@@ -29,7 +29,7 @@ Requires **Windows 11 x64**, an installed and configured **Equalizer APO**, and 
 3. If prompted about a missing runtime, install the separately provided `windowsdesktop-runtime-…-win-x64.exe`, then run the app again. Alternatively, select **.NET Desktop Runtime → Windows → x64** on [Microsoft's download page](https://dotnet.microsoft.com/en-us/download/dotnet/10.0). The plain .NET Runtime does not include desktop UI support; you do not need the SDK.
 4. Find the tray icon, click it to open the menu, and choose a preset. The icon may be in the tray's hidden-icons area.
 
-If no configurations are found, use **配置文件位置 → 选择 config.txt…** to select the main file actually loaded by Equalizer APO. The current app menus are in Chinese; the labels below match the interface.
+After successful automatic discovery, the menu reads **配置文件已自动识别** (configuration file automatically detected); hover over it to open the submenu. A manual location or read failure uses **配置文件位置** instead. If no configurations are found, use **配置文件位置 → 手动配置 config.txt…** to select the main file actually loaded by Equalizer APO. The current app menus are in Chinese; the labels below match the interface.
 
 ## Everyday controls
 
@@ -39,7 +39,7 @@ If no configurations are found, use **配置文件位置 → 选择 config.txt�
 | Apply a preset immediately | Click its name at the top of the menu |
 | Choose cycle members | Check presets in **循环以下配置**; the menu stays open for consecutive selections |
 | Switch to the next member | Double-click the tray icon; cycling follows their order in the main configuration |
-| Change the main file | **配置文件位置 → 选择 config.txt…**; **恢复自动定位** restores automatic discovery |
+| Change the main file | Hover over **配置文件已自动识别** or **配置文件位置**, then choose **手动配置 config.txt…**; **恢复自动定位** restores automatic discovery |
 | Start at Windows sign-in | Check **开机自启动**; off by default |
 | Exit | Choose **退出**; the current APO configuration stays active |
 
