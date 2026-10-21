@@ -36,9 +36,11 @@ internal static class TrayMenuBuilder
         if (cycleEntries.Count == 0) cycleEntries.Add(new("未找到一级配置", false));
         entries.Add(new("循环以下配置", Children: cycleEntries));
         entries.Add(MenuEntry.Separator);
-        entries.Add(new("配置文件位置", Children:
+        string locationText = settings?.ConfigFilePath is null && config is not null && configError is null
+            ? "配置文件已自动识别" : "配置文件位置";
+        entries.Add(new(locationText, Children:
         [
-            new("选择 config.txt…", Action: chooseConfigFile),
+            new("手动配置 config.txt…", Action: chooseConfigFile),
             new("恢复自动定位", Enabled: settings?.ConfigFilePath is not null, Action: restoreAutomaticConfig)
         ]));
         entries.Add(MenuEntry.Separator);
