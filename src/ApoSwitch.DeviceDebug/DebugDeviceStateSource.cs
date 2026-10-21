@@ -5,7 +5,7 @@ using ApoSwitch.Core;
 
 namespace ApoSwitch.DeviceDebug;
 
-/// <summary>Only constructed after an explicit --device-debug startup argument.</summary>
+/// <summary>Only constructed by the separate ApoSwitch.Debug host.</summary>
 public sealed class DebugDeviceStateSource : IDeviceStateSource
 {
     private readonly IDeviceStateSource real;

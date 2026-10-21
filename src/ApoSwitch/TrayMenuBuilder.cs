@@ -6,7 +6,7 @@ internal static class TrayMenuBuilder
 {
     public static IReadOnlyList<MenuEntry> Build(DeviceState device, ConfigDocument? config, string? configError,
         UserSettings? settings, bool debug, bool autoStart, Action<string> apply, Func<string, bool> toggleCycle,
-        Action toggleAutoStart, Action exit)
+        Action toggleAutoStart, Action exit, Action chooseConfigFile, Action restoreAutomaticConfig)
     {
         var entries = new List<MenuEntry> { new(debug ? "APO 切换器 · 调试模式" : "APO 切换器", false), MenuEntry.Separator };
         if (!device.CanApply || configError is not null)
@@ -16,6 +16,11 @@ internal static class TrayMenuBuilder
                 : device.Availability == DeviceAvailability.NoDevice ? "无播放设备" : "未知设备";
             entries.Add(new("设备：" + name, false));
             if (!device.CanApply && configError is not null) entries.Add(new("无法读取 config.txt", false));
+            if (configError is not null)
+            {
+                string detail = configError.Replace('\r', ' ').Replace('\n', ' ');
+                entries.Add(new(detail.Length > 140 ? detail[..139] + "…" : detail, false));
+            }
             entries.Add(MenuEntry.Separator);
         }
         var presets = config?.Presets ?? [];
@@ -30,6 +35,12 @@ internal static class TrayMenuBuilder
             ToggleChecked: () => toggleCycle(p.Id))).ToList();
         if (cycleEntries.Count == 0) cycleEntries.Add(new("未找到一级配置", false));
         entries.Add(new("循环以下配置", Children: cycleEntries));
+        entries.Add(MenuEntry.Separator);
+        entries.Add(new("配置文件位置", Children:
+        [
+            new("选择 config.txt…", Action: chooseConfigFile),
+            new("恢复自动定位", Enabled: settings?.ConfigFilePath is not null, Action: restoreAutomaticConfig)
+        ]));
         entries.Add(MenuEntry.Separator);
         entries.Add(new("开机自启动", Checked: autoStart, Action: toggleAutoStart));
         entries.Add(new("退出", Action: exit));

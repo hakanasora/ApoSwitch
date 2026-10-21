@@ -4,7 +4,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <LangVersion>latest</LangVersion>
-    <Version>1.0.11</Version>
+    <Version>1.0.12</Version>
     <Authors>APO Switch</Authors>
     <Deterministic>true</Deterministic>
     <NuGetAudit>false</NuGetAudit>

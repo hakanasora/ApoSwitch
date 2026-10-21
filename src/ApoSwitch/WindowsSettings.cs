@@ -1,4 +1,5 @@
 using Microsoft.Win32;
+using ApoSwitch.Core;
 
 namespace ApoSwitch;
 
@@ -8,14 +9,19 @@ public static class WindowsSettings
     private const string ValueName = "ApoSwitch";
     public static string ConfigPath()
     {
+        var installations = new List<ApoInstallationPaths>();
         foreach (var view in new[] { RegistryView.Registry64, RegistryView.Registry32 })
         {
-            using var root = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, view);
-            using var key = root.OpenSubKey(@"SOFTWARE\EqualizerAPO");
-            if (key?.GetValue("ConfigPath") is string directory && directory.Length > 0)
-                return Path.Combine(Environment.ExpandEnvironmentVariables(directory), "config.txt");
+            try
+            {
+                using var root = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, view);
+                using var key = root.OpenSubKey(@"SOFTWARE\EqualizerAPO");
+                installations.Add(new(key?.GetValue("ConfigPath") as string, key?.GetValue("InstallPath") as string));
+            }
+            catch (Exception ex) when (ex is UnauthorizedAccessException or System.Security.SecurityException or IOException)
+            { /* Try the other registry view; manual selection remains available. */ }
         }
-        return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "EqualizerAPO", "config", "config.txt");
+        return ConfigPathResolver.ResolveAutomatic(installations, Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles));
     }
     public static bool AutoStartEnabled
     {

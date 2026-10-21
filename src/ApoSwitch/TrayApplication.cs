@@ -11,16 +11,16 @@ internal sealed class TrayApplication : ApplicationContext
     private Icon normalIcon;
     private Icon warningIcon;
     private (int Number, bool Multiple, bool Unavailable, int Size, bool Dark)? iconAppearance;
-    private readonly ConfigStore configStore;
-    private readonly SettingsStore settingsStore;
+    private readonly ConfigWorkspace configuration;
     private readonly IDeviceStateSource device;
     private readonly System.Windows.Forms.Timer refreshTimer = new() { Interval = 5000 };
     private readonly System.Windows.Forms.Timer debounce = new() { Interval = 180 };
     private readonly System.Windows.Forms.Timer singleClick = new() { Interval = SystemInformation.DoubleClickTime };
-    private FileSystemWatcher? watcher;
-    private ConfigDocument? config;
-    private UserSettings? settings;
-    private string? configError;
+    private readonly ConfigFileWatcher watcher;
+    private ConfigStore? configStore => configuration.Store;
+    private ConfigDocument? config => configuration.Document;
+    private UserSettings? settings => configuration.Settings;
+    private string? configError => configuration.Error;
     private bool disposed;
     private bool menuOpen;
     private bool suppressNextLeftMouseUp;
@@ -51,23 +51,13 @@ internal sealed class TrayApplication : ApplicationContext
             }
         };
         owner.SettingsChanged += (_, _) => Post(UpdateIcons);
-        configStore = new ConfigStore(WindowsSettings.ConfigPath());
-        settingsStore = new SettingsStore(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        var settingsStore = new SettingsStore(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "ApoSwitch", "settings.json"));
+        configuration = new ConfigWorkspace(settingsStore, WindowsSettings.ConfigPath, ShowError);
+        watcher = new ConfigFileWatcher(() => Post(ScheduleReload));
         device = createDevice is null ? new WindowsDeviceStateSource(Post) : createDevice(Post);
         device.Changed += DeviceChanged;
         ReloadConfig();
-        var directory = Path.GetDirectoryName(configStore.FilePath)!;
-        if (Directory.Exists(directory))
-        {
-            watcher = new FileSystemWatcher(directory, Path.GetFileName(configStore.FilePath))
-                { NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.FileName | NotifyFilters.Size, EnableRaisingEvents = true };
-            watcher.Changed += OnConfigChanged;
-            watcher.Created += OnConfigChanged;
-            watcher.Deleted += OnConfigChanged;
-            watcher.Renamed += OnConfigChanged;
-            watcher.Error += (_, _) => Post(ScheduleReload);
-        }
         debounce.Tick += (_, _) => { debounce.Stop(); ReloadConfig(); };
         refreshTimer.Tick += (_, _) => { device.Refresh(); ReloadConfig(); };
         refreshTimer.Start();
@@ -81,26 +71,12 @@ internal sealed class TrayApplication : ApplicationContext
         catch (InvalidOperationException) { /* Shutdown raced an audio/file callback. */ }
     }
     private void DeviceChanged(object? sender, EventArgs e) => Post(UpdatePresentation);
-    private void OnConfigChanged(object sender, FileSystemEventArgs e) => Post(ScheduleReload);
     private void ScheduleReload() { debounce.Stop(); debounce.Start(); }
 
     private void ReloadConfig()
     {
-        try { config = configStore.Read(); configError = null; }
-        catch (Exception ex) { config = null; configError = ex.Message; }
-        if (config is not null && settings is null)
-        {
-            try
-            {
-                settings = settingsStore.Load(config.Presets);
-                if (!File.Exists(settingsStore.FilePath)) settingsStore.Save(settings);
-            }
-            catch (Exception ex)
-            {
-                settings = UserSettings.Initial(config.Presets);
-                ShowError("无法读取或保存循环设置：" + ex.Message);
-            }
-        }
+        configuration.Refresh();
+        watcher.Watch(configStore?.FilePath);
         UpdatePresentation();
     }
 
@@ -170,7 +146,8 @@ internal sealed class TrayApplication : ApplicationContext
             device.Refresh();
             ReloadConfig();
             var entries = TrayMenuBuilder.Build(device.Current, config, configError, settings, debug,
-                WindowsSettings.AutoStartEnabled, Apply, ToggleCycle, ToggleAutoStart, ExitThread);
+                WindowsSettings.AutoStartEnabled, Apply, ToggleCycle, ToggleAutoStart, ExitThread,
+                ChooseConfigFile, RestoreAutomaticConfig);
             using var menu = new NativeMenu(entries);
             menu.Show(owner.Handle, Cursor.Position);
         }
@@ -190,18 +167,45 @@ internal sealed class TrayApplication : ApplicationContext
     {
         device.Refresh();
         if (!device.Current.CanApply) return;
-        try { configStore.Activate(id); ReloadConfig(); }
+        try
+        {
+            ReloadConfig();
+            if (configError is not null || configStore is null) throw new IOException(configError ?? "未找到主配置文件。");
+            configStore.Activate(id);
+            ReloadConfig();
+        }
         catch (Exception ex) { ReloadConfig(); ShowError("切换失败：" + ex.Message); }
     }
     private bool ToggleCycle(string id)
     {
         if (settings is null) return false;
-        var changed = new UserSettings { CyclePresetIds = [.. settings.CyclePresetIds] };
-        if (changed.Contains(id)) changed.CyclePresetIds.RemoveAll(p => StringComparer.OrdinalIgnoreCase.Equals(p, id));
-        else changed.CyclePresetIds.Add(id);
-        try { settingsStore.Save(changed); settings = changed; }
+        try { return configuration.ToggleCycle(id); }
         catch (Exception ex) { ShowError("循环设置保存失败：" + ex.Message); }
         return settings.Contains(id);
+    }
+    private void ChooseConfigFile()
+    {
+        using var dialog = new OpenFileDialog
+        {
+            Title = "选择 Equalizer APO 主 config.txt",
+            Filter = "APO 主配置 (config.txt)|config.txt",
+            FileName = "config.txt", CheckFileExists = true, Multiselect = false, RestoreDirectory = true
+        };
+        string? directory = Path.GetDirectoryName(configStore?.FilePath);
+        if (directory is not null && Directory.Exists(directory)) dialog.InitialDirectory = directory;
+        if (dialog.ShowDialog() != DialogResult.OK) return;
+        try
+        {
+            configuration.SelectFile(dialog.FileName);
+            watcher.Watch(configStore?.FilePath);
+            UpdatePresentation();
+        }
+        catch (Exception ex) { ShowError("配置文件选择失败：" + ex.Message); }
+    }
+    private void RestoreAutomaticConfig()
+    {
+        try { configuration.RestoreAutomatic(); ReloadConfig(); }
+        catch (Exception ex) { ShowError("无法恢复自动定位：" + ex.Message); }
     }
     private void ToggleAutoStart()
     {
@@ -222,7 +226,7 @@ internal sealed class TrayApplication : ApplicationContext
             disposed = true;
             refreshTimer.Stop(); debounce.Stop(); singleClick.Stop();
             refreshTimer.Dispose(); debounce.Dispose(); singleClick.Dispose();
-            watcher?.Dispose();
+            watcher.Dispose();
             device.Changed -= DeviceChanged;
             device.Dispose();
             tray.Visible = false; tray.Dispose();

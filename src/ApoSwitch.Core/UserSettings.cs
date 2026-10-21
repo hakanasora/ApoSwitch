@@ -5,6 +5,8 @@ namespace ApoSwitch.Core;
 public sealed class UserSettings
 {
     public List<string> CyclePresetIds { get; set; } = [];
+    public string? ConfigFilePath { get; set; }
+    public UserSettings Copy() => new() { CyclePresetIds = [.. CyclePresetIds], ConfigFilePath = ConfigFilePath };
     public static UserSettings Initial(IReadOnlyList<Preset> presets)
     {
         var selected = presets.Where(p => p.Name.Equals("New Door Open", StringComparison.OrdinalIgnoreCase)
@@ -25,9 +27,10 @@ public sealed class UserSettings
 public sealed class SettingsStore(string path)
 {
     public string FilePath { get; } = path;
-    public UserSettings Load(IReadOnlyList<Preset> presets) => File.Exists(FilePath)
+    public UserSettings? LoadSaved() => File.Exists(FilePath)
         ? JsonSerializer.Deserialize<UserSettings>(File.ReadAllText(FilePath)) ?? throw new IOException("循环设置为空。")
-        : UserSettings.Initial(presets);
+        : null;
+    public UserSettings Load(IReadOnlyList<Preset> presets) => LoadSaved() ?? UserSettings.Initial(presets);
     public void Save(UserSettings settings)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(FilePath)!);

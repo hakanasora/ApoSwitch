@@ -29,7 +29,7 @@ internal sealed class MenuPreview : Form
             {
                 var state = new DeviceState((DeviceAvailability)states.SelectedIndex);
                 var entries = TrayMenuBuilder.Build(state, config, null, settings, false, false, _ => { },
-                    id => { if (settings.Contains(id)) settings.CyclePresetIds.Remove(id); else settings.CyclePresetIds.Add(id); return settings.Contains(id); }, () => { }, () => { });
+                    id => { if (settings.Contains(id)) settings.CyclePresetIds.Remove(id); else settings.CyclePresetIds.Add(id); return settings.Contains(id); }, () => { }, () => { }, () => { }, () => { });
                 using var menu = new NativeMenu(entries);
                 menu.Show(Handle, PointToScreen(new Point(35, 150)), dark);
             };
