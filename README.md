@@ -24,7 +24,7 @@ ApoSwitch 在后台驻留，自动查找并读取 Equalizer APO 的主 `config.t
 
 需要 **Windows 11 x64**、已安装并配置好的 **Equalizer APO**，以及 **.NET 10 Windows Desktop Runtime x64**。
 
-1. 打开[最新版下载页面](https://github.com/hakanasora/ApoSwitch/releases/latest)，下载主程序 EXE。普通使用无需下载 `device-debug-tools.zip` 或源码包。
+1. 打开[最新版下载页面](https://github.com/hakanasora/ApoSwitch/releases/latest)，下载主程序 EXE。
 2. 将 EXE 放到固定位置，保存为 `ApoSwitch.exe` 后运行。这个文件名也是“开机自启动”使用的名称。
 3. 如果提示缺少运行环境，安装发行版中单独提供的 `windowsdesktop-runtime-…-win-x64.exe`，再运行主程序。也可以从[微软官方下载页](https://dotnet.microsoft.com/en-us/download/dotnet/10.0)选择 **.NET Desktop Runtime → Windows → x64**；普通 .NET Runtime 不包含桌面界面支持，无需安装 SDK。
 4. 在任务栏托盘中找到图标，单击打开菜单，选择配置即可。图标也可能位于托盘的折叠菜单中。
