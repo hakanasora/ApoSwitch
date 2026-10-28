@@ -26,19 +26,42 @@ public sealed class UserSettings
 
 public sealed class SettingsStore(string path)
 {
-    public string FilePath { get; } = path;
-    public UserSettings? LoadSaved() => File.Exists(FilePath)
-        ? JsonSerializer.Deserialize<UserSettings>(File.ReadAllText(FilePath)) ?? throw new IOException("循环设置为空。")
-        : null;
-    public UserSettings Load(IReadOnlyList<Preset> presets) => LoadSaved() ?? UserSettings.Initial(presets);
+    private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
+    private readonly object saveGate = new();
+    public string FilePath { get; } = Path.GetFullPath(path);
+
+    public UserSettings? LoadSaved()
+    {
+        string json;
+        try { json = File.ReadAllText(FilePath); }
+        catch (FileNotFoundException) { return null; }
+        catch (DirectoryNotFoundException) { return null; }
+
+        var settings = JsonSerializer.Deserialize<UserSettings>(json)
+            ?? throw new IOException("用户设置为空。");
+        settings.CyclePresetIds = (settings.CyclePresetIds ?? [])
+            .Where(id => !string.IsNullOrWhiteSpace(id)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        if (string.IsNullOrWhiteSpace(settings.ConfigFilePath)) settings.ConfigFilePath = null;
+        else if (!Path.IsPathFullyQualified(settings.ConfigFilePath))
+            throw new IOException("保存的主配置路径不是绝对路径。");
+        return settings;
+    }
+
     public void Save(UserSettings settings)
     {
-        Directory.CreateDirectory(Path.GetDirectoryName(FilePath)!);
-        string temporary = FilePath + ".tmp";
+        ArgumentNullException.ThrowIfNull(settings);
+        string directory = Path.GetDirectoryName(FilePath)!;
+        Directory.CreateDirectory(directory);
+        string temporary = Path.Combine(directory, ".aposwitch-settings-" + Guid.NewGuid().ToString("N") + ".tmp");
         try
         {
-            File.WriteAllText(temporary, JsonSerializer.Serialize(settings, new JsonSerializerOptions { WriteIndented = true }));
-            File.Move(temporary, FilePath, true);
+            using (var stream = new FileStream(temporary, FileMode.CreateNew, FileAccess.Write, FileShare.None,
+                       4096, FileOptions.WriteThrough))
+            {
+                JsonSerializer.Serialize(stream, settings, JsonOptions);
+                stream.Flush(true);
+            }
+            lock (saveGate) File.Move(temporary, FilePath, true);
         }
         finally { if (File.Exists(temporary)) File.Delete(temporary); }
     }

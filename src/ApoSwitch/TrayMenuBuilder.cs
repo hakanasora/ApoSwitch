@@ -15,12 +15,11 @@ internal static class TrayMenuBuilder
             string name = !string.IsNullOrWhiteSpace(device.Name) ? device.Name
                 : device.Availability == DeviceAvailability.NoDevice ? "无播放设备" : "未知设备";
             entries.Add(new("设备：" + name, false));
+            if (device.Availability == DeviceAvailability.Error && !string.IsNullOrWhiteSpace(device.Detail))
+                entries.Add(new(SingleLineDetail(device.Detail), false));
             if (!device.CanApply && configError is not null) entries.Add(new("无法读取 config.txt", false));
             if (configError is not null)
-            {
-                string detail = configError.Replace('\r', ' ').Replace('\n', ' ');
-                entries.Add(new(detail.Length > 140 ? detail[..139] + "…" : detail, false));
-            }
+                entries.Add(new(SingleLineDetail(configError), false));
             entries.Add(MenuEntry.Separator);
         }
         var presets = config?.Presets ?? [];
@@ -47,5 +46,11 @@ internal static class TrayMenuBuilder
         entries.Add(new("开机自启动", Checked: autoStart, Action: toggleAutoStart));
         entries.Add(new("退出", Action: exit));
         return entries;
+    }
+
+    private static string SingleLineDetail(string text)
+    {
+        string detail = text.Replace('\r', ' ').Replace('\n', ' ').Replace('\t', ' ');
+        return detail.Length > 140 ? detail[..139] + "…" : detail;
     }
 }

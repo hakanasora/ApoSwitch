@@ -25,7 +25,7 @@ The output directory must be empty or not yet exist; the default is `artifacts`.
 
 Publishing targets Windows x64 with `SelfContained=false` and `PublishSingleFile=true`. ReadyToRun, trimming and debug symbols are disabled. Application code, the core library and artwork are bundled; Windows Forms and framework resources come from the shared .NET 10 Windows Desktop Runtime x64. The SDK may restore Microsoft build packages.
 
-`tools/Get-Runtime.ps1` currently pins the official 10.0.12 x64 desktop runtime installer. It verifies the SHA512 from Microsoft's release metadata and the Microsoft Authenticode signature, then records the results. It never installs the runtime; the pinned installer does not require users to run that exact runtime patch version.
+`tools/Get-Runtime.ps1` currently pins the official 10.0.12 x64 desktop runtime installer. It verifies the SHA512 from Microsoft's release metadata and the Microsoft Authenticode signature, then records the results. Manifest and download requests have 30-second and 300-second timeouts. Downloads use unique temporary files and receive their final name only after verification; failures clean up temporary files, valid caches are reused and invalid caches are downloaded again. It never installs the runtime; the pinned installer does not require users to run that exact runtime patch version.
 
 Publish the main EXE, optional runtime and debug tools as separate downloads. Product download links point to the latest GitHub Release rather than a fixed version or local packaging directory. The build copies documentation into `docs`, preserving language links and artwork references. Source, tools and build commands are used from the [repository](https://github.com/hakanasora/ApoSwitch).
 
@@ -37,6 +37,8 @@ A non-null `ConfigFilePath` setting overrides discovery. Manual selection reads 
 
 Automatic mode resolves again when opening the menu, applying a preset and polling. The watcher follows the main file, with a 180 ms debounce and a five-second refresh as fallback.
 
+Each refresh still reads the main file and reports read failures. Identical bytes reuse the parsed document; timestamps and lengths alone never determine cache validity. Watcher errors schedule a rebuild on the next refresh rather than replacing the watcher on its callback thread.
+
 Only direct `Include:` lines and their commented equivalents are parsed. No nested files are read and no directories are scanned. Duplicate target paths form one candidate at their first position. Applying a candidate enables one Include for that target and disables the other candidate lines, preserving other text, directives, encoding and line endings.
 
 Writes check that the target file exists, write and flush a temporary file in the same directory, verify that the original has not changed, then use `File.Replace` with an `.aposwitch.bak` backup. Unchanged contents are not rewritten. Resource contents and audible results are outside these checks.
@@ -44,6 +46,8 @@ Writes check that the target file exists, write and flush a temporary file in th
 ## Preferences and tray behavior
 
 Preferences live in `%LOCALAPPDATA%\ApoSwitch\settings.json`. `CyclePresetIds` stores membership; absent or null `ConfigFilePath` means automatic discovery. Older settings remain compatible, and changing membership preserves the chosen location.
+
+Loading normalizes null collections, empty members and duplicate members; a saved manual path must be absolute. Invalid or unreadable settings report an error instead of guessing a location and overwriting the original. Repairing or unlocking the file allows another read; explicitly selecting a main file can also save recovered settings. Saves use unique temporary files in the same directory and atomic replacement after flushing, with commits serialized per store instance.
 
 Cycling follows candidate order in the main file, not selection order. A preset outside the cycle starts at the first member; an empty cycle does nothing; an already exclusively active single member is not rewritten. `UserSettings.Initial` defines first-run membership, including legacy preset-name compatibility. Later candidates do not automatically join the cycle. Startup only reads the existing configuration.
 
@@ -65,11 +69,23 @@ To use the debugging tools:
 
 The simulator connects through a current-user-only local named pipe. Overrides stay in memory; disconnecting or restarting restores real detection. The tools share the installed desktop runtime, and startup still targets production.
 
+Protocol lines are limited to 4096 characters excluding CRLF, with bounded buffering. Invalid JSON receives an explicit rejection; oversized frames disconnect and allow reconnection. Listener failures appear in device error details. Shutdown cancels pending work without blocking the UI; asynchronous disposal can wait for the pipe to close fully.
+
 **Only device state is simulated. Preset changes in the debug tray still modify the real selected main configuration.**
 
 ## Checks
 
-`-RunChecks` runs configuration, cycle, path and device-state checks, followed by production release isolation checks. Normal checks modify temporary configurations and query the real device read-only.
+`-RunChecks` runs configuration, cycle, path, menu and simulated-device protocol checks, production release isolation, and offline runtime-downloader regressions. Normal checks use temporary configurations and do not require a playback device. Downloader checks mock network and signature results without downloading an installer.
+
+Checks are organized into domain-specific partial files with a shared entry point and no third-party test framework. These optional checks require a Windows desktop session; tray and simulator checks briefly create UI but use isolated configurations and in-memory device states. Run from the repository root:
+
+```powershell
+dotnet run --project tests/ApoSwitch.Checks -c Release -- --device-check
+dotnet run --project tests/ApoSwitch.Checks -c Release -- --tray-check
+dotnet run --project tests/ApoSwitch.Checks -c Release -- --simulator-check
+```
+
+`--device-check` queries real Core Audio read-only. `--core-checks`, `--menu-checks` and `--debug-checks` run individual logic groups. Actual audio-service restart recovery and audible results still require real-world acceptance; a successful ordinary query does not verify those failure scenarios.
 
 `-LiveConfigChecks` briefly changes the real APO configuration and restores the original bytes. Use it only when explicitly needed, never as part of routine documentation validation.
 

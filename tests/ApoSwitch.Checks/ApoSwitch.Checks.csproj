@@ -3,5 +3,6 @@
   <ItemGroup>
     <ProjectReference Include="../../src/ApoSwitch/ApoSwitch.csproj" />
     <ProjectReference Include="../../src/ApoSwitch.DeviceDebug/ApoSwitch.DeviceDebug.csproj" />
+    <ProjectReference Include="../../src/ApoSwitch.DeviceSimulator/ApoSwitch.DeviceSimulator.csproj" />
   </ItemGroup>
 </Project>

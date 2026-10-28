@@ -60,5 +60,7 @@ if ($RunChecks -or $LiveConfigChecks) {
     $assemblies = Join-Path $PSScriptRoot 'src\ApoSwitch\bin\Release\net10.0-windows\win-x64'
     & $DotnetPath $checkDll --verify-release $appOutput $assemblies
     if ($LASTEXITCODE -ne 0) { throw 'Production isolation checks failed.' }
+    & (Join-Path $PSScriptRoot 'tests\RuntimeDownloadChecks.ps1')
+    if (!$?) { throw 'Runtime download checks failed.' }
 }
 Write-Host "Output: $OutputDirectory"

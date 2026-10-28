@@ -15,11 +15,14 @@ internal sealed class SimulatorForm : Form
     private StreamReader? reader;
     private StreamWriter? writer;
     private bool busy;
+    private bool disposed;
     private readonly CancellationTokenSource closing = new();
+    private readonly CancellationToken closingToken;
     private readonly Icon applicationIcon;
 
     public SimulatorForm()
     {
+        closingToken = closing.Token;
         using (var stream = typeof(SimulatorForm).Assembly.GetManifestResourceStream("ApoSwitch.ApplicationIcon")!)
             applicationIcon = new Icon(stream, SystemInformation.IconSize);
         Icon = applicationIcon;
@@ -54,7 +57,6 @@ internal sealed class SimulatorForm : Form
         }
         status.Margin = new Padding(0, 16, 0, 0);
         layout.Controls.Add(status);
-        FormClosed += (_, _) => { closing.Cancel(); Disconnect(); };
     }
 
     private Button Button(string text, Func<Task> action)
@@ -62,18 +64,18 @@ internal sealed class SimulatorForm : Form
         var button = new Button { Text = text, AutoSize = true, MinimumSize = new Size(70, 30) };
         button.Click += async (_, _) =>
         {
-            if (busy) return;
+            if (busy || disposed) return;
             busy = true;
             commands.ForEach(b => b.Enabled = false);
             try { await action(); }
-            catch (Exception ex) when (ex is IOException or TimeoutException or OperationCanceledException or InvalidOperationException)
+            catch (Exception ex) when (ex is IOException or InvalidDataException or TimeoutException or OperationCanceledException or InvalidOperationException)
             {
                 Disconnect();
-                if (!IsDisposed) status.Text = ex is TimeoutException
+                if (!disposed) status.Text = ex is TimeoutException
                     ? "未连接到调试托盘。请先退出正常实例，再点击“启动调试托盘”。" : "连接中断：" + ex.Message;
             }
-            catch (Exception ex) { if (!IsDisposed) status.Text = ex.Message; }
-            finally { busy = false; if (!IsDisposed) commands.ForEach(b => b.Enabled = true); }
+            catch (Exception ex) { if (!disposed) status.Text = ex.Message; }
+            finally { busy = false; if (!disposed) commands.ForEach(b => b.Enabled = true); }
         };
         commands.Add(button);
         return button;
@@ -83,28 +85,33 @@ internal sealed class SimulatorForm : Form
     {
         string executable = Path.Combine(AppContext.BaseDirectory, "ApoSwitch.Debug.exe");
         if (!File.Exists(executable)) { status.Text = "请把模拟器与 ApoSwitch.Debug.exe 放在同一文件夹。"; return; }
-        Process.Start(new ProcessStartInfo(executable)
+        using var process = Process.Start(new ProcessStartInfo(executable)
             { UseShellExecute = false, WindowStyle = ProcessWindowStyle.Hidden, WorkingDirectory = AppContext.BaseDirectory });
         status.Text = "已请求启动调试托盘；托盘出现后点击“连接”。";
     }
     private async Task ConnectAsync()
     {
         Disconnect();
-        pipe = new NamedPipeClientStream(".", DeviceDebugProtocol.PipeName, PipeDirection.InOut,
+        closingToken.ThrowIfCancellationRequested();
+        var connection = new NamedPipeClientStream(".", DeviceDebugProtocol.PipeName, PipeDirection.InOut,
             PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
-        await pipe.ConnectAsync(1200, closing.Token);
-        reader = new StreamReader(pipe, Encoding.UTF8, false, 1024, true);
-        writer = new StreamWriter(pipe, new UTF8Encoding(false), 1024, true) { AutoFlush = true };
+        pipe = connection;
+        await connection.ConnectAsync(1200, closingToken);
+        closingToken.ThrowIfCancellationRequested();
+        reader = new StreamReader(connection, Encoding.UTF8, false, 1024, true);
+        writer = new StreamWriter(connection, new UTF8Encoding(false), 1024, true) { AutoFlush = true };
         status.Text = "已连接。点击状态按钮即可模拟；尚未覆盖真实检测。";
     }
     private async Task SendAsync(string state)
     {
         if (pipe?.IsConnected != true) await ConnectAsync();
-        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(closing.Token);
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(closingToken);
         timeout.CancelAfter(3000);
         await writer!.WriteLineAsync(JsonSerializer.Serialize(new DeviceDebugMessage(state, deviceName.Text)).AsMemory(), timeout.Token);
-        string response = await reader!.ReadLineAsync(timeout.Token) ?? throw new IOException("托盘程序已断开。");
-        var reply = JsonSerializer.Deserialize<DeviceDebugReply>(response) ?? throw new IOException("托盘响应无效。");
+        string response = await DeviceDebugProtocol.ReadLineAsync(reader!, timeout.Token) ?? throw new IOException("托盘程序已断开。");
+        DeviceDebugReply reply;
+        try { reply = JsonSerializer.Deserialize<DeviceDebugReply>(response) ?? throw new IOException("托盘响应无效。"); }
+        catch (JsonException ex) { throw new IOException("托盘响应无效。", ex); }
         status.Text = (reply.Ok ? "已更新：" : "未更新：") + reply.Message;
     }
     private void Disconnect()
@@ -120,7 +127,14 @@ internal sealed class SimulatorForm : Form
 
     protected override void Dispose(bool disposing)
     {
+        if (disposing && !disposed)
+        {
+            disposed = true;
+            closing.Cancel();
+            Disconnect();
+            closing.Dispose();
+            applicationIcon.Dispose();
+        }
         base.Dispose(disposing);
-        if (disposing) applicationIcon.Dispose();
     }
 }

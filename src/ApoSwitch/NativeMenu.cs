@@ -17,7 +17,7 @@ internal sealed class NativeMenu : IDisposable
     private sealed record ToggleItem(nint Menu, uint Position, Func<bool> Toggle);
     private readonly List<ToggleItem> toggles = [];
     private uint nextId = 100;
-    private readonly nint handle;
+    private nint handle;
     public NativeMenu(IReadOnlyList<MenuEntry> entries) => handle = Build(entries);
     private nint Build(IReadOnlyList<MenuEntry> entries)
     {
@@ -29,9 +29,10 @@ internal sealed class NativeMenu : IDisposable
             {
                 var entry = entries[position];
                 uint flags = (entry.Enabled ? 0u : 0x3u) | (entry.Checked ? 0x8u : 0u);
+                nint submenu = 0;
                 nuint id;
                 if (entry.Text == "-") { flags = 0x800; id = 0; }
-                else if (entry.Children is not null) { flags |= 0x10; id = (nuint)Build(entry.Children); }
+                else if (entry.Children is not null) { flags |= 0x10; submenu = Build(entry.Children); id = (nuint)submenu; }
                 else
                 {
                     id = nextId++;
@@ -43,7 +44,13 @@ internal sealed class NativeMenu : IDisposable
                         actions[(uint)id] = () => toggle.Toggle();
                     }
                 }
-                if (!AppendMenu(menu, flags, id, entry.Text.Replace("&", "&&"))) throw new Win32Exception();
+                if (!AppendMenu(menu, flags, id, entry.Text.Replace("&", "&&")))
+                {
+                    int error = Marshal.GetLastWin32Error();
+                    // The parent owns a child only after AppendMenu succeeds.
+                    if (submenu != 0) DestroyMenu(submenu);
+                    throw new Win32Exception(error);
+                }
             }
             return menu;
         }
@@ -51,6 +58,7 @@ internal sealed class NativeMenu : IDisposable
     }
     public void Show(nint owner, Point location, bool? darkTheme = null)
     {
+        ObjectDisposedException.ThrowIf(handle == 0, this);
         NativeTheme.Apply(owner, darkTheme);
         SetForegroundWindow(owner);
         uint chosen;
@@ -117,7 +125,12 @@ internal sealed class NativeMenu : IDisposable
         if (callbackError is not null) ExceptionDispatchInfo.Capture(callbackError).Throw();
         if (actions.TryGetValue(chosen, out var action)) action();
     }
-    public void Dispose() => DestroyMenu(handle);
+    public void Dispose()
+    {
+        nint previous = handle;
+        handle = 0;
+        if (previous != 0) DestroyMenu(previous);
+    }
     [DllImport("user32.dll")] private static extern nint CreatePopupMenu();
     [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true, EntryPoint = "AppendMenuW")]
     [return: MarshalAs(UnmanagedType.Bool)] private static extern bool AppendMenu(nint menu, uint flags, nuint id, string text);

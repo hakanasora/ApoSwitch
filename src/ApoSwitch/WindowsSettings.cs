@@ -38,7 +38,15 @@ public static class WindowsSettings
     public static bool TaskbarDark => ReadTheme("SystemUsesLightTheme") == 0;
     private static int ReadTheme(string name)
     {
-        using var key = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize");
-        return key?.GetValue(name) is int value ? value : 1;
+        try
+        {
+            using var key = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize");
+            return key?.GetValue(name) is int value ? value : 1;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Security.SecurityException)
+        {
+            // Appearance is optional: an inaccessible preference must not stop the tray or its refresh timer.
+            return 1;
+        }
     }
 }

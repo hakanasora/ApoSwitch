@@ -36,10 +36,12 @@ internal static class TrayIcons
         using var format = StringFormat.GenericTypographic;
         string suffix = multiplePresets ? "+" : presetNumber > 0
             ? presetNumber.ToString(System.Globalization.CultureInfo.InvariantCulture) : "?";
+        var metrics = warning ? default : MeasurePreset(family, format);
         // WarningSolid (U+F736) is supplied by Windows 11's Segoe Fluent Icons font.
-        using var path = warning ? CreateTextPath("\uF736", family, format, FontStyle.Regular) : CreatePresetPath(suffix, family, format);
+        using var path = warning ? CreateTextPath("\uF736", family, format, FontStyle.Regular) : CreatePresetPath(suffix, family, format, metrics);
         // Numbers and state symbols share layout bounds so EQ stays fixed when the state changes.
-        RectangleF bounds = warning ? path.GetBounds() : PresetLayoutBounds(suffix, family, format);
+        RectangleF bounds = warning ? path.GetBounds()
+            : new RectangleF(0, metrics.Top, metrics.PrefixWidth + 1 + suffix.Length * metrics.SlotWidth, metrics.Bottom - metrics.Top);
         var target = warning
             ? new RectangleF(size / 32f, size / 32f, size * .9375f, size * .9375f)
             : new RectangleF(size / 32f, size * .09375f, size * .9375f, size * .8125f);
@@ -125,15 +127,9 @@ internal static class TrayIcons
         return (bounds.Width, slotWidth, top, bottom);
     }
 
-    private static RectangleF PresetLayoutBounds(string suffix, FontFamily family, StringFormat format)
+    private static GraphicsPath CreatePresetPath(string suffix, FontFamily family, StringFormat format,
+        (float PrefixWidth, float SlotWidth, float Top, float Bottom) metrics)
     {
-        var metrics = MeasurePreset(family, format);
-        return new RectangleF(0, metrics.Top, metrics.PrefixWidth + 1 + suffix.Length * metrics.SlotWidth, metrics.Bottom - metrics.Top);
-    }
-
-    private static GraphicsPath CreatePresetPath(string suffix, FontFamily family, StringFormat format)
-    {
-        var metrics = MeasurePreset(family, format);
         var path = CreateTextPath("EQ", family, format);
         using (var shift = new Matrix(1, 0, 0, 1, -path.GetBounds().Left, 0)) path.Transform(shift);
         for (int i = 0; i < suffix.Length; i++)

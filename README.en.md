@@ -67,6 +67,8 @@ Only direct `Include:` and commented `# Include:` lines in the main `config.txt`
 
 If the main file cannot be read, select the correct file under **配置文件位置**. A manual location is remembered; choose **恢复自动定位** to return to automatic discovery. This choice changes the switcher's target, not which main file Equalizer APO loads.
 
+If the error says “无法读取用户设置” (cannot read user settings), the app preserves the original settings and pauses preset application. Repairing or unlocking the settings file allows it to retry; alternatively, explicitly select **手动配置 config.txt…** to choose a location and save recovered settings.
+
 ### Will nested Includes be changed?
 
 No. ApoSwitch does not expand nested files and only changes the enabled state of root-level candidates. Other directives, comments, encoding and line endings are preserved. The previous main file is backed up as `config.txt.aposwitch.bak` in the same folder.

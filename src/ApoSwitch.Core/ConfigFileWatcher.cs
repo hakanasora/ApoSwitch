@@ -2,11 +2,15 @@ namespace ApoSwitch.Core;
 
 public sealed class ConfigFileWatcher(Action changed) : IDisposable
 {
-    private FileSystemWatcher? watcher;
+    private volatile FileSystemWatcher? watcher;
+    private volatile bool disposed;
+    private int restartRequested;
     public string? FilePath { get; private set; }
     public void Watch(string? path)
     {
-        if (watcher is not null && StringComparer.OrdinalIgnoreCase.Equals(FilePath, path)) return;
+        ObjectDisposedException.ThrowIf(disposed, this);
+        bool restart = Interlocked.Exchange(ref restartRequested, 0) != 0;
+        if (!restart && watcher is not null && StringComparer.OrdinalIgnoreCase.Equals(FilePath, path)) return;
         watcher?.Dispose();
         watcher = null;
         FilePath = path;
@@ -19,7 +23,7 @@ public sealed class ConfigFileWatcher(Action changed) : IDisposable
             watcher.Created += OnChanged;
             watcher.Deleted += OnChanged;
             watcher.Renamed += OnChanged;
-            watcher.Error += (_, _) => changed();
+            watcher.Error += OnError;
             watcher.EnableRaisingEvents = true;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
@@ -29,6 +33,21 @@ public sealed class ConfigFileWatcher(Action changed) : IDisposable
             watcher = null;
         }
     }
-    private void OnChanged(object sender, FileSystemEventArgs e) => changed();
-    public void Dispose() { watcher?.Dispose(); watcher = null; }
+    private void OnChanged(object sender, FileSystemEventArgs e)
+    {
+        if (!disposed && ReferenceEquals(sender, watcher)) changed();
+    }
+    private void OnError(object sender, ErrorEventArgs e)
+    {
+        if (disposed || !ReferenceEquals(sender, watcher)) return;
+        Interlocked.Exchange(ref restartRequested, 1);
+        changed();
+    }
+    public void Dispose()
+    {
+        if (disposed) return;
+        disposed = true;
+        watcher?.Dispose();
+        watcher = null;
+    }
 }

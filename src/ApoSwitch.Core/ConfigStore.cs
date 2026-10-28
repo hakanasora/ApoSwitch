@@ -2,9 +2,17 @@ namespace ApoSwitch.Core;
 
 public sealed class ConfigStore(string filePath)
 {
+    private ConfigDocument? cachedDocument;
     public string FilePath { get; } = Path.GetFullPath(filePath);
     public string BackupPath => FilePath + ".aposwitch.bak";
-    public ConfigDocument Read() => ConfigDocument.Load(FilePath);
+    public ConfigDocument Read()
+    {
+        // Always read the file: timestamp-only caches miss same-size external edits and read failures.
+        byte[] bytes = File.ReadAllBytes(FilePath);
+        if (cachedDocument is null || !bytes.AsSpan().SequenceEqual(cachedDocument.OriginalBytes))
+            cachedDocument = ConfigDocument.Parse(FilePath, bytes);
+        return cachedDocument;
+    }
 
     public bool Activate(string presetId)
     {

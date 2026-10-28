@@ -26,9 +26,12 @@ public sealed class WindowsDeviceStateSource : IDeviceStateSource
         {
             if (enumerator is null)
             {
-                enumerator = (IMMDeviceEnumerator)new MMDeviceEnumeratorClass();
-                notifications = new NotificationClient(() => dispatch(Refresh));
-                Marshal.ThrowExceptionForHR(enumerator.RegisterEndpointNotificationCallback(notifications));
+                var candidate = (IMMDeviceEnumerator)new MMDeviceEnumeratorClass();
+                var callback = new NotificationClient(() => dispatch(Refresh));
+                try { Marshal.ThrowExceptionForHR(candidate.RegisterEndpointNotificationCallback(callback)); }
+                catch { Marshal.ReleaseComObject(candidate); throw; }
+                enumerator = candidate;
+                notifications = callback;
             }
             int result = enumerator.GetDefaultAudioEndpoint(0, 1, out var device); // render, multimedia
             if (result == unchecked((int)0x80070490)) state = new(DeviceAvailability.NoDevice);
@@ -43,6 +46,12 @@ public sealed class WindowsDeviceStateSource : IDeviceStateSource
                 }
                 finally { Marshal.ReleaseComObject(device); }
             }
+        }
+        catch (COMException ex)
+        {
+            // A disconnected audio service leaves its old COM session unusable; retry with a new one next time.
+            ReleaseEnumerator();
+            state = new(DeviceAvailability.Error, Detail: ex.Message);
         }
         catch (Exception ex) { state = new(DeviceAvailability.Error, Detail: ex.Message); }
         if (Current != state) { Current = state; Changed?.Invoke(this, EventArgs.Empty); }
@@ -82,11 +91,24 @@ public sealed class WindowsDeviceStateSource : IDeviceStateSource
 
     public void Dispose()
     {
+        if (disposed) return;
         disposed = true;
-        if (enumerator is null) return;
-        if (notifications is not null) enumerator.UnregisterEndpointNotificationCallback(notifications);
-        Marshal.ReleaseComObject(enumerator);
+        ReleaseEnumerator();
+    }
+
+    private void ReleaseEnumerator()
+    {
+        var previous = enumerator;
+        var callback = notifications;
         enumerator = null;
+        notifications = null;
+        if (previous is null) return;
+        try
+        {
+            if (callback is not null) previous.UnregisterEndpointNotificationCallback(callback);
+        }
+        catch (COMException) { /* A disconnected COM session cannot unregister its callback. */ }
+        finally { Marshal.ReleaseComObject(previous); }
     }
 
     [DllImport("ole32.dll")] private static extern int PropVariantClear(ref PropVariant value);

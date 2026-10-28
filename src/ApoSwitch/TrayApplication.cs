@@ -25,7 +25,8 @@ internal sealed class TrayApplication : ApplicationContext
     private bool menuOpen;
     private bool suppressNextLeftMouseUp;
 
-    public TrayApplication(Func<Action<Action>, IDeviceStateSource>? createDevice = null, bool debug = false)
+    public TrayApplication(Func<Action<Action>, IDeviceStateSource>? createDevice = null, bool debug = false,
+        ConfigWorkspace? configuration = null)
     {
         this.debug = debug;
         _ = dispatcher.Handle;
@@ -38,7 +39,7 @@ internal sealed class TrayApplication : ApplicationContext
             if (e.Button != MouseButtons.Left) return;
             singleClick.Stop();
             suppressNextLeftMouseUp = true;
-            Cycle();
+            Apply(null); // No explicit selection: advance through the configured cycle.
         };
         tray.MouseUp += (_, e) =>
         {
@@ -51,9 +52,9 @@ internal sealed class TrayApplication : ApplicationContext
             }
         };
         owner.SettingsChanged += (_, _) => Post(UpdateIcons);
-        var settingsStore = new SettingsStore(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "ApoSwitch", "settings.json"));
-        configuration = new ConfigWorkspace(settingsStore, WindowsSettings.ConfigPath, ShowError);
+        this.configuration = configuration ?? new ConfigWorkspace(new SettingsStore(Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "ApoSwitch", "settings.json")),
+            WindowsSettings.ConfigPath, ShowError);
         watcher = new ConfigFileWatcher(() => Post(ScheduleReload));
         device = createDevice is null ? new WindowsDeviceStateSource(Post) : createDevice(Post);
         device.Changed += DeviceChanged;
@@ -61,7 +62,6 @@ internal sealed class TrayApplication : ApplicationContext
         debounce.Tick += (_, _) => { debounce.Stop(); ReloadConfig(); };
         refreshTimer.Tick += (_, _) => { device.Refresh(); ReloadConfig(); };
         refreshTimer.Start();
-        UpdatePresentation();
     }
 
     private void Post(Action action)
@@ -82,9 +82,10 @@ internal sealed class TrayApplication : ApplicationContext
 
     private void UpdatePresentation()
     {
-        bool unavailable = device.Current.Availability == DeviceAvailability.NotInstalled;
+        var currentDevice = device.Current;
+        bool unavailable = currentDevice.Availability == DeviceAvailability.NotInstalled;
         bool warning = configError is not null
-            || device.Current.Availability is DeviceAvailability.NoDevice or DeviceAvailability.Error;
+            || currentDevice.Availability is DeviceAvailability.NoDevice or DeviceAvailability.Error;
         int activeNumber = 0;
         int activeCount = 0;
         if (config is not null)
@@ -112,9 +113,10 @@ internal sealed class TrayApplication : ApplicationContext
             tray.Icon = warning ? warningIcon : normalIcon;
             oldNormal.Dispose(); oldWarning.Dispose();
         }
-        else tray.Icon = warning ? warningIcon : normalIcon;
+        else if (!ReferenceEquals(tray.Icon, warning ? warningIcon : normalIcon))
+            tray.Icon = warning ? warningIcon : normalIcon;
         string text;
-        if (!device.Current.CanApply) text = device.Current.ToolTip;
+        if (!currentDevice.CanApply) text = currentDevice.ToolTip;
         else if (configError is not null) text = "无法读取 APO 配置";
         else
         {
@@ -126,9 +128,10 @@ internal sealed class TrayApplication : ApplicationContext
                 _ => $"同时启用 {names.Length} 套配置\n" + string.Join(" + ", names)
             };
         }
-        if (debug) text += device.Current.IsSimulated ? "\n调试模式 · 模拟设备" : "\n调试模式 · 真实设备";
-        if (!string.IsNullOrWhiteSpace(device.Current.Name)) text += "\n" + device.Current.Name;
-        tray.Text = text.Length > 63 ? text[..62] + "…" : text;
+        if (debug) text += currentDevice.IsSimulated ? "\n调试模式 · 模拟设备" : "\n调试模式 · 真实设备";
+        if (!string.IsNullOrWhiteSpace(currentDevice.Name)) text += "\n" + currentDevice.Name;
+        text = text.Length > 63 ? text[..62] + "…" : text;
+        if (tray.Text != text) tray.Text = text;
     }
 
     private void UpdateIcons()
@@ -155,15 +158,7 @@ internal sealed class TrayApplication : ApplicationContext
         finally { menuOpen = false; }
     }
 
-    private void Cycle()
-    {
-        device.Refresh();
-        ReloadConfig();
-        if (!device.Current.CanApply || config is null || settings is null) return;
-        string? next = settings.Next(config.Presets);
-        if (next is not null) Apply(next);
-    }
-    private void Apply(string id)
+    private void Apply(string? id)
     {
         device.Refresh();
         if (!device.Current.CanApply) return;
@@ -171,6 +166,8 @@ internal sealed class TrayApplication : ApplicationContext
         {
             ReloadConfig();
             if (configError is not null || configStore is null) throw new IOException(configError ?? "未找到主配置文件。");
+            id ??= settings?.Next(config!.Presets);
+            if (id is null) return;
             configStore.Activate(id);
             ReloadConfig();
         }

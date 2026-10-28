@@ -1,3 +1,6 @@
+using System.Security;
+using System.Text.Json;
+
 namespace ApoSwitch.Core;
 
 /// <summary>Settings and active root file; selecting a location never writes an APO configuration.</summary>
@@ -6,6 +9,8 @@ public sealed class ConfigWorkspace
     private readonly SettingsStore settingsStore;
     private readonly Func<string> automaticPath;
     private readonly Action<string> reportSettingsError;
+    private bool settingsLoaded;
+    private string? settingsError;
     public UserSettings? Settings { get; private set; }
     public ConfigStore? Store { get; private set; }
     public ConfigDocument? Document { get; private set; }
@@ -16,12 +21,12 @@ public sealed class ConfigWorkspace
         this.settingsStore = settingsStore;
         this.automaticPath = automaticPath;
         this.reportSettingsError = reportSettingsError ?? (_ => { });
-        try { Settings = settingsStore.LoadSaved(); }
-        catch (Exception ex) { this.reportSettingsError("无法读取循环设置：" + ex.Message); }
+        TryLoadSettings();
     }
 
     public void Refresh()
     {
+        if (!TryLoadSettings()) return;
         try
         {
             string path = Settings?.ConfigFilePath ?? automaticPath();
@@ -39,6 +44,27 @@ public sealed class ConfigWorkspace
         }
     }
 
+    private bool TryLoadSettings()
+    {
+        if (settingsLoaded) return true;
+        try
+        {
+            Settings = settingsStore.LoadSaved();
+            settingsLoaded = true;
+            settingsError = null;
+            return true;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or SecurityException or JsonException)
+        {
+            string message = "无法读取用户设置：" + ex.Message;
+            Document = null;
+            Error = message;
+            if (settingsError != message) reportSettingsError(message);
+            settingsError = message;
+            return false;
+        }
+    }
+
     public void SelectFile(string path)
     {
         var candidate = new ConfigStore(path);
@@ -47,6 +73,8 @@ public sealed class ConfigWorkspace
         changed.ConfigFilePath = candidate.FilePath;
         settingsStore.Save(changed);
         Settings = changed;
+        settingsLoaded = true;
+        settingsError = null;
         Store = candidate;
         Document = document;
         Error = null;

@@ -27,6 +27,7 @@ public sealed class ConfigDocument
         (encoding, preamble) = DetectEncoding(bytes);
         var text = encoding.GetString(bytes, preamble.Length, bytes.Length - preamble.Length);
         var entries = new List<Preset>();
+        var indexes = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
         // Splitting the root text is the entire discovery operation: no recursive includes or directory scan.
         foreach (Match split in Regex.Matches(text, @"([^\r\n]*)(\r\n|\n|\r|$)"))
         {
@@ -42,10 +43,12 @@ public sealed class ConfigDocument
                 var target = includePath.Length > 1 && includePath[0] == '"' && includePath[^1] == '"'
                     ? includePath[1..^1] : includePath;
                 id = Path.GetFullPath(target, Path.GetDirectoryName(FilePath)!);
-                var previous = entries.FindIndex(p => StringComparer.OrdinalIgnoreCase.Equals(p.Id, id));
                 bool enabled = !match.Groups["comment"].Success;
-                if (previous < 0)
+                if (!indexes.TryGetValue(id, out int previous))
+                {
+                    indexes.Add(id, entries.Count);
                     entries.Add(new(id, Path.GetFileNameWithoutExtension(target), includePath, enabled));
+                }
                 else if (enabled)
                     entries[previous] = entries[previous] with { IsEnabled = true };
             }
@@ -54,7 +57,8 @@ public sealed class ConfigDocument
         Presets = entries;
     }
 
-    public static ConfigDocument Load(string path) => new(path, File.ReadAllBytes(path));
+    public static ConfigDocument Load(string path) => Parse(path, File.ReadAllBytes(path));
+    internal static ConfigDocument Parse(string path, byte[] bytes) => new(path, bytes);
 
     public byte[] Activate(string id)
     {
